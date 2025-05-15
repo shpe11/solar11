@@ -29,8 +29,8 @@ $regName = [
 
 
 $servername = "localhost";
-$username = "phpuser";
-$password = "akhenaton";
+$username = "***";
+$password = "***";
 $dbname = "shpe";
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
