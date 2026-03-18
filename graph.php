@@ -2,10 +2,10 @@
 
 date_default_timezone_set('Europe/Bucharest');
 
-$servername = "localhost";
-$username = "***";
+$servername = "***";
+$username = "****";
 $password = "***";
-$dbname = "shpe";
+$dbname = "***";
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
     die("Conexiune e?uata: " . $conn->connect_error);
@@ -54,6 +54,10 @@ if(isset($_GET["gvv"]))graph(isset($_GET["days"])?"SELECT * FROM inverter WHERE 
 if(isset($_GET["gta"]))graph(isset($_GET["days"])?"SELECT * FROM inverter WHERE type='day' ORDER BY -dta":"SELECT teslaA*100 AS TA FROM inverter WHERE dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id","#FFF","totalT","TA");
 
 if(isset($_GET["gtv"]))graph(isset($_GET["days"])?"SELECT * FROM inverter WHERE type='day' ORDER BY -dta":"SELECT teslaV*10 AS TV FROM inverter WHERE dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id","#FCC","totalT","TV");
+
+foreach([0,1,2,3] as $plug){
+    if(isset($_GET["gp".$plug]))graph(isset($_GET["days"])?"SELECT * FROM inverter WHERE type='day' ORDER BY -dta":"SELECT plug".$plug." FROM inverter WHERE dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id","#00F","plug".$plug,"plug".$plug);
+}
 
 function graph($sql,$color,$R1,$R2){
 	global $conn,$k,$canvasHeight;

@@ -5,6 +5,7 @@
 <style>
 	body{
 	font-family: "Open Sans", sans-serif;
+        margin:0px;
 }
 	
 <?php 
@@ -22,8 +23,8 @@ date_default_timezone_set('Europe/Bucharest');
 
 $servername = "localhost";
 $username = "***";
-$password = "***";
-$dbname = "shpe";
+$password = "***!";
+$dbname = "****";
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
     die("Conexiune e?uata: " . $conn->connect_error);
@@ -56,7 +57,7 @@ canvas { display:block; }
 	text-align: center;
 	cursor:pointer;
 }
-</style>
+</style> 
 <?php
 if($CRON=="(L"){$cmode="#00F";}
 if($CRON=="(A"){$cmode="#F0F";}
@@ -65,9 +66,9 @@ if($CRON=="(B"){$cmode="#F00";}
 <div class="button" onClick="document.location='?';">today</div>
 <div class="button" onClick="document.location='?days';">last 30days</div>
 <div class="button" onClick="document.location='?days&days90';">last 90days</div>
-<div class="button" onclick="if(confirm('line mode?'))document.location='?cmd=POP00'" style="background:<?php echo $cmode?>;">USB</div>
-<div class="button" onclick="if(confirm('default mode?'))document.location='?cmd=POP01'" style="background:<?php echo $cmode?>;">SUB</div>
-<div class="button" onclick="if(confirm('battery mode?'))document.location='?cmd=POP02'" style="background:<?php echo $cmode?>;">SBU</div>
+<div class="button" onclick="if(confirm('line mode?'))document.location='?cmd=POP00'" style="color:#FFF;background:<?php echo $cmode?>;">USB</div>
+<div class="button" onclick="if(confirm('default mode?'))document.location='?cmd=POP01'" style="color:#FFF;background:<?php echo $cmode?>;">SUB</div>
+<div class="button" onclick="if(confirm('battery mode?'))document.location='?cmd=POP02'" style="color:#FFF;background:<?php echo $cmode?>;">SBU</div>
 
 <?php
 $regName = [
@@ -127,14 +128,13 @@ $canvasHeight=512;
 $canvasWidth=1440;
 $k=$canvasHeight/min(max($row["max"],1),isset($_GET["days"])?70000:7000);?>
 
-<span style="font-size: 2em;">
+<div style="font-size: 2em;">
 ALL: <b><?php echo round($row["total"]/1000,2);?>KW</b>
 TESLA: <b><?php echo round($row["totalT"]/1000,2);?>KW</b>
 PV: <b><?php echo round($row["PVw"]/1000,2);?>KW</b>
 PV LOST: <b><?php echo round($row["PVloss"]/1000,2);?>KW</b>
-</span>
+</div>
 
-<br>
 <canvas id="canvas" width="<?php echo $canvasWidth; ?>" height="<?php echo $canvasHeight;?>" style="width:100%;height:<?php echo $canvasHeight;?>px"></canvas>
 <br>
 <script>
@@ -152,12 +152,12 @@ if (canvas.getContext) {
 		ctx.lineTo(canvas.width,canvas.height-(i+step)*1000*<?php echo $k?>);
 		ctx.lineTo(0,canvas.height-(i+step)*1000*<?php echo $k?>);
 	}
-	ctx.lineWidth=1;
-    ctx.strokeStyle="#080";
+	ctx.lineWidth=3;
+    ctx.strokeStyle="#444";
     ctx.stroke();
 
 	ctx.font = "15px Arial, Helvetica, sans-serif";
-	ctx.fillStyle="#0F0";
+	ctx.fillStyle="#FFF";
 	ctx.beginPath();
 	K=<?php echo isset($_GET["days"])?24/30:1;?>;
 	for(i=0;i<31;i+=2){
@@ -168,21 +168,35 @@ if (canvas.getContext) {
 		ctx.fillText(i+1, 60*(i+1)*K+1, canvas.height-8);
 		ctx.fillText(i, 60*i*K+1, canvas.height-8);
 	}
-	ctx.lineWidth=1;
-    ctx.strokeStyle="#080";
+	ctx.lineWidth=3;
+    ctx.strokeStyle="#444";
     ctx.stroke();
 
-	loadAJAX('graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gpower&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#F00");});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gpower&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#F00",1);});
 	var date = new Date();
     var curDate = null;
     do { curDate = new Date(); }
     while(curDate-date < 1000);
-	loadAJAX('graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gpv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#FF0",1);});
-	loadAJAX('graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gbat&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#0F0",1);});
-	loadAJAX('graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#88F",1);});
-	loadAJAX('graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gvv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#33F",1);});
-	loadAJAX('graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gta&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#FFF",1);});
-	loadAJAX('graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gtv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#E00",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gpv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#FF0",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gbat&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#0F0",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#88F",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gvv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#33F",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gta&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#FFF",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gtv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#F0F",1);});
+    
+    let datas = [];
+    let loaded = 0;
+    let total = 4;
+    <?php foreach([0,1,2,3] as $plug){?>
+    loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?gp<?php echo $plug?>&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>',
+    function (xhr) {
+        datas[<?php echo $plug?>] = xhr.responseText;
+        loaded++;
+        if (loaded === total) {
+            drawGraphX(datas, "#0FF");
+        }
+    });
+    <?php }?>
 
 	function loadAJAX(url, callback){
 		var xhr = new XMLHttpRequest();
@@ -198,24 +212,71 @@ if (canvas.getContext) {
 		ctx.moveTo(0,1440);
 
 		graph=data.response.split(";");
+        lasty=0;
 		for (i = 0; i < graph.length; i++) {
     		graph[i] = graph[i].split(",");
-			if(color!="#FFF"&&color!="#E00"){
-				ctx.lineTo(graph[i][0],(i!=0&&graph[i][1]==<?php echo $canvasHeight?>)?graph[i-1][1]:graph[i][1]);
-			}else{
-				ctx.lineTo(graph[i][0],graph[i][1]);
-			}
+			<?php if(isset($_GET["days"])||isset($_GET["days90"])){ ?>
+            ctx.lineTo(graph[i][0],graph[i][1]);
+            <?php }else{ ?>
+            ctx.lineTo(graph[i][0],lasty=((graph[i][1]>=<?php echo $canvasHeight-1?>)?lasty:graph[i][1]));
+			if(i>2&&graph[i-2][1]>=<?php echo $canvasHeight-1?>)lasty=graph[i][1];
+            <?php } ?>
 		}
 
 		ctx.lineWidth=lw;
 		ctx.strokeStyle=color;
 		ctx.stroke();
 	}
+    
+    function drawGraphX(datas,color) {
+        var colors = [
+            "rgba(255, 255, 255, .5)",
+            "rgba(0, 255, 255, .5)",
+            "rgba(255, 0, 255, .5)",
+            "rgba(255, 255, 0, .5)"
+        ];
+        graphs=[];
+        for(d = 0; d < datas.length; d++) {
+            graphs.push(datas[d].split(";"))
+        }
+		for (i = 0; i < graphs[0].length; i++) {
+            lasty=0;
+            for(g = 0; g < graphs.length; g++) {
+                graphs[g][i] = graphs[g][i].split(",");
+                ctx.beginPath();
+                ctx.moveTo(graphs[g][i][0],<?php echo $canvasHeight;?>-lasty);
+                ctx.lineTo(graphs[g][i][0],graphs[g][i][1]-lasty);
+                lasty+=<?php echo $canvasHeight;?>-graphs[g][i][1];
+                ctx.lineWidth=1;
+                ctx.strokeStyle = colors[g];
+                ctx.stroke();
+                console.log(graphs[g][i][1]);
+            }
+		}
+	}
 
 }
 </script>
 
-<span style="font-size: 2em">
+<div>
+<?php foreach([200,201,202,203] as $plug){ ?>
+  <span id="PLUG<?php echo $plug; ?>">...</span>
+<?php } ?>
+</div>
+<script>
+const plugs = [];//[200,201,202,203];
+plugs.forEach((plug) => {
+  fetch('plug.php?plug=' + plug)
+    .then(res => res.text())
+    .then(data => {
+      document.getElementById("PLUG"+plug).innerHTML = data;
+    })
+    .catch(err => console.error('Eroare AJAX:', err));        
+});
+</script>
+
+
+<div style="font-size: 2em;padding: 1%;">
 <?php
 $r=$conn->query("SELECT * FROM inverter ORDER BY -id LIMIT 0,1");
 while($row = $r->fetch_assoc()) {
@@ -224,7 +285,7 @@ while($row = $r->fetch_assoc()) {
 		echo "<br>".$regName[$i].": <b>".$row["reg".$i]."</b>";
 	}
 }?>
-</span>
+</div>
 
 <?php 
 $conn->close();

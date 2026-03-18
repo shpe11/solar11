@@ -3,23 +3,24 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	teslaBin = "/usr/local/bin/tesla-control"
-	vin      = "***"
-	keyFile  = "/etc/tesla/private_pkcs8.pem"
+	teslaBin = "/***/tesla-control"
+	vin      = "LRWY*************"
+	keyFile  = "/***/private_pkcs8.pem"
 )
 
-var mu sync.Mutex // mutex pentru a preveni exec paralel BLE
+var mu sync.Mutex
 
-// Lista comenzi critice ce nu se permit prin HTTP
 var forbiddenCommands = []string{
 	"unlock",
 	"door-unlock",
@@ -30,28 +31,36 @@ var forbiddenCommands = []string{
 
 func main() {
 	http.HandleFunc("/command", commandHandler)
-
 	log.Println("Tesla HTTP daemon running on http://127.0.0.1:8080")
 	log.Fatal(http.ListenAndServe("127.0.0.1:8080", nil))
 }
 
 func commandHandler(w http.ResponseWriter, r *http.Request) {
+
+	enableLog := r.URL.Query().Get("log") != ""
 	cmdStr := r.URL.Query().Get("cmd")
 	if cmdStr == "" {
 		http.Error(w, "missing cmd", http.StatusBadRequest)
 		return
 	}
 
-	// Verifica comenzi interzise
+	timeoutSec := 5
+	if t := r.URL.Query().Get("timeout"); t != "" {
+		if parsed, err := strconv.Atoi(t); err == nil && parsed > 0 {
+			timeoutSec = parsed
+		}
+	}
+
 	for _, forbidden := range forbiddenCommands {
 		if strings.HasPrefix(cmdStr, forbidden) {
 			http.Error(w, "command forbidden for security", http.StatusForbidden)
-			log.Printf("Blocked forbidden command: %s", cmdStr)
+			if enableLog {
+				log.Printf("Blocked forbidden command: %s", cmdStr)
+			}
 			return
 		}
 	}
 
-	// Lock BLE
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -60,10 +69,9 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 		"-vin", vin,
 		"-key-file", keyFile,
 	}
-	args = append(args, splitCmd(cmdStr)...)
+	args = append(args, strings.Fields(cmdStr)...)
 
-	// Context cu timeout 5s
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, teslaBin, args...)
@@ -72,7 +80,9 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 
-	log.Printf("Executing command: %v", cmd.Args)
+	if enableLog {
+		log.Printf("Executing: %v", cmd.Args)
+	}
 
 	err := cmd.Run()
 
@@ -81,21 +91,17 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			w.WriteHeader(http.StatusGatewayTimeout)
-			w.Write([]byte("command timeout after 5s\n"))
-			log.Printf("Command timeout: %v", cmd.Args)
+			w.Write([]byte(fmt.Sprintf("command timeout after %ds\n", timeoutSec)))
 			return
 		}
-
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write(out.Bytes())
-		log.Printf("Command failed: %v\nOutput:\n%s", err, out.String())
 		return
 	}
 
 	w.Write(out.Bytes())
-	log.Printf("Command succeeded:\n%s", out.String())
-}
 
-func splitCmd(s string) []string {
-	return strings.Fields(s)
+	if enableLog {
+		log.Printf("Output:\n%s", out.String())
+	}
 }

@@ -1,4 +1,8 @@
 <?php
+ini_set('display_errors', 0); 
+ini_set('display_startup_errors', 0); 
+error_reporting(E_ALL ^ E_WARNING);
+
 $lock = fopen('/tmp/tesla.lock', 'c');
 if (!flock($lock, LOCK_EX | LOCK_NB)) {
     exit; // deja rulează altul
@@ -109,10 +113,10 @@ if (!$fp) {
 }
 
 //save to DB
-$servername = "localhost";
+$servername = "***";
 $username = "***";
-$password = "***";
-$dbname = "shpe";
+$password = "***!";
+$dbname = "***";
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
     die("Conexiune eșuată: " . $conn->connect_error);
@@ -141,7 +145,17 @@ try {
                 SUM(reg5)/60 AS total, 
                 MAX(reg4) AS max, 
                 SUM(reg12*reg13)/60 AS PVw, 
-                SUM(IF(reg12*reg13-reg5>0,(reg12*reg13-reg5)/60,0)) AS PVloss
+                SUM(IF(reg12*reg13-reg5>0,(reg12*reg13-reg5)/60,0)) AS PVloss,
+                SUM(COALESCE(plug0, 0))/60 AS plug0,
+                SUM(COALESCE(plug1, 0))/60 AS plug1,
+                SUM(COALESCE(plug2, 0))/60 AS plug2,
+                SUM(COALESCE(plug3, 0))/60 AS plug3,
+                SUM(COALESCE(plug4, 0))/60 AS plug4,
+                SUM(COALESCE(plug5, 0))/60 AS plug5,
+                SUM(COALESCE(plug6, 0))/60 AS plug6,
+                SUM(COALESCE(plug7, 0))/60 AS plug7,
+                SUM(COALESCE(plug8, 0))/60 AS plug8,
+                SUM(COALESCE(plug9, 0))/60 AS plug9
             FROM inverter
             WHERE type IS NULL
               AND dta >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
@@ -152,13 +166,23 @@ try {
 
         //  Inserăm rândul day
         $conn->query("
-            INSERT INTO inverter (totalT, total, max, PVw, PVloss, type, dta)
+            INSERT INTO inverter (totalT, total, max, PVw, PVloss, plug0, plug1, plug2, plug3, plug4, plug5, plug6, plug7, plug8, plug9, type, dta)
             VALUES (
                 ".floatval($row["totalT"]).",
                 ".floatval($row["total"]).",
                 ".floatval($row["max"]).",
                 ".floatval($row["PVw"]).",
                 ".floatval($row["PVloss"]).",
+                ".floatval($row["plug0"]).",
+                ".floatval($row["plug1"]).",
+                ".floatval($row["plug2"]).",
+                ".floatval($row["plug3"]).",
+                ".floatval($row["plug4"]).",
+                ".floatval($row["plug5"]).",
+                ".floatval($row["plug6"]).",
+                ".floatval($row["plug7"]).",
+                ".floatval($row["plug8"]).",
+                ".floatval($row["plug9"]).",
                 'day',
                 DATE_SUB(CURDATE(), INTERVAL 1 DAY)
             )
@@ -183,6 +207,26 @@ try {
 $CVdb=$CAdb=0;
 include("tesla.php");
 
+$p=[];
+foreach([0,1,2,3] as $plug){
+    if (date("Hi") == "0000"){
+        $cmd="Restart%201";
+    }else{
+        $cmd="Status%208";
+    }
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, "http://192.168.100.20$plug/cm?cmnd=".$cmd);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+    $json = curl_exec($ch);
+    curl_close($ch);
+    
+    $json = json_decode($json, true);
+    $p[$plug] = isset($json['StatusSNS']['ENERGY']['ApparentPower']) ? round($json['StatusSNS']['ENERGY']['ApparentPower'],1) : 0;
+}
+
 if(!empty($inverterDATA)){
 	$inverterDATA=explode(" ",substr($inverterDATA,1));
 	$pre="";$sqlA=$sqlB="";
@@ -191,7 +235,7 @@ if(!empty($inverterDATA)){
 		$sqlB.=$pre."'".floatval($inverterDATA[$i])."'";
 		$pre=",";
 	}
-	$sql="INSERT INTO inverter ($sqlA,teslaV,teslaA) VALUES ($sqlB,$CVdb,$CAdb)";
+	$sql="INSERT INTO inverter ($sqlA,teslaV,teslaA,plug0,plug1,plug2,plug3) VALUES ($sqlB,$CVdb,$CAdb,$p[0],$p[1],$p[2],$p[3])";
 	if($inverterDATA[5]<7000){
 		$conn->query($sql);
 	}

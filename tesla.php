@@ -1,6 +1,6 @@
 <?php 
 if(date("Hi")>=0&&date("Hi")<=2359){
-    $output = file_get_contents("http://127.0.0.1:8080/command?cmd=".urlencode("state charge"));
+    $output = file_get_contents("http://127.0.0.1:8080/command?timeout=11&cmd=".urlencode("state charge"));
     $outt=implode('}', array_slice(explode('}', $output), 0, -1)) . '}';
     $outt=json_decode($outt,true);
 
@@ -16,8 +16,8 @@ if(date("Hi")>=0&&date("Hi")<=2359){
     );
 
     $update = false;
-    if ($CV > 185) {$CA++;$update = true;}
-    if ($CV < 175 && $CV > 0) {$CA -= 2;$update = true;}
+    if ($CV > 190) {$CA++;$update = true;}
+    if ($CV < 180 && $CV > 0) {$CA -= 2;$update = true;}
     if ($CA < 5)  $CA = 5;
     if ($CA > 18) $CA = 18;
     if (!$update && date("i") % 5 == 0) {
@@ -30,7 +30,7 @@ if(date("Hi")>=0&&date("Hi")<=2359){
     }
 
     if($update){
-        $output = file_get_contents("http://127.0.0.1:8080/command?cmd=".urlencode("charging-set-amps ".$CA));
+        $output = file_get_contents("http://127.0.0.1:8080/command?timeout=11&cmd=".urlencode("charging-set-amps ".$CA));
         $outt=implode('}', array_slice(explode('}', $output), 0, -1)) . '}';
         $outt=json_decode($outt,true);
         file_put_contents(
