@@ -2,8 +2,8 @@
 
 date_default_timezone_set('Europe/Bucharest');
 
-$servername = "***";
-$username = "****";
+$servername = "localhost";
+$username = "***";
 $password = "***";
 $dbname = "***";
 $conn = new mysqli($servername, $username, $password, $dbname);
@@ -43,9 +43,10 @@ $k=$_GET["k"];
 
 if(isset($_GET["gpower"]))graph(isset($_GET["days"])?"SELECT * FROM inverter WHERE type='day' ORDER BY -dta":"SELECT * FROM inverter WHERE dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id","#F00","total","reg5");
 
-if(isset($_GET["gpv"]))graph(isset($_GET["days"])?"SELECT PVw FROM inverter WHERE type='day' ORDER BY -dta":"SELECT reg12*reg13 AS PVw FROM inverter WHERE dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id","#FF0","PVw","PVw");
+if(isset($_GET["gpv"]))graph(isset($_GET["days"])?"SELECT PVw FROM inverter WHERE type='day' ORDER BY -dta":"SELECT reg12*reg13 AS PVw FROM inverter WHERE reg12*reg13<7000 AND dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id","#FF0","PVw","PVw");
  
-if(isset($_GET["gbat"]))graph(isset($_GET["days"])?"SELECT POW(reg8,2)-1700 AS REG8,dta FROM inverter WHERE type='day' ORDER BY -dta":"SELECT reg8*1000/52.5 AS REG8 FROM inverter WHERE dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id","#0F0","reg8","REG8");
+if(isset($_GET["gbat"]))graph(isset($_GET["days"])?"SELECT POW(reg8,2)-1700 AS REG8,dta FROM inverter WHERE type='day' ORDER BY -dta":"SELECT (reg8-46)*1000/(52.5-46) AS REG8 FROM inverter WHERE dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id","#0F0","reg8","REG8");
+if(isset($_GET["gbatp"]))graph(isset($_GET["days"])?"SELECT POW(reg10,2)-1700 AS REG8,dta FROM inverter WHERE type='day' ORDER BY -dta":"SELECT reg10*1000/100 AS REG10 FROM inverter WHERE dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id","#8F8","reg10","REG10");
 
 if(isset($_GET["gv"]))graph(isset($_GET["days"])?"SELECT * FROM inverter WHERE type='day' ORDER BY -dta":"SELECT reg0*10 AS REG0 FROM inverter WHERE dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id","#00F","reg0","REG0");
 

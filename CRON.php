@@ -5,7 +5,7 @@ error_reporting(E_ALL ^ E_WARNING);
 
 $lock = fopen('/tmp/tesla.lock', 'c');
 if (!flock($lock, LOCK_EX | LOCK_NB)) {
-    exit; // deja rulează altul
+    exit;
 }
 
 ini_set('display_errors', 1);
@@ -47,6 +47,29 @@ usleep(500000);
 */
 
 shell_exec("stty -F $port 2400 cs8 -cstopb -parenb -crtscts");
+
+$servername = "localhost";
+$username = "***";
+$password = "****";
+$dbname = "***";
+$conn = new mysqli($servername, $username, $password, $dbname);
+if ($conn->connect_error) {
+    die("Conexiune eșuată: " . $conn->connect_error);
+}
+
+$VARS=[];
+$r=$conn->query("SELECT * FROM variabile");
+while($row=$r->fetch_assoc()){
+    $VARS[$row["nume"]]=$row["val"];
+}
+if($VARS["batterySoft"]==2){
+    $_GET["cmd"]="POP01";
+    $conn->query("UPDATE variabile SET val=22 WHERE nume='batterySoft'");
+}
+if($VARS["batterySoft"]==3){
+    $_GET["cmd"]="POP02";
+    $conn->query("UPDATE variabile SET val=33 WHERE nume='batterySoft'");
+}
 
 $fp = fopen($port, "r+");
 if (!$fp) {
@@ -105,23 +128,16 @@ if (!$fp) {
 		usleep(50000);
 	}
 	fclose($fp); 
-	echo $response;
+	//echo $response;
 	if(isset($_GET["cmd"])){
 		exit;
 	}
 	$inverterDATA = $response;
 }
-
-//save to DB
-$servername = "***";
-$username = "***";
-$password = "***!";
-$dbname = "***";
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) {
-    die("Conexiune eșuată: " . $conn->connect_error);
+if(!empty($inverterDATA)){
+    $inverterDATA=explode(" ",substr($inverterDATA,1));
 }
-
+//save to DB
 
 // SUMDAY optimizat, index-friendly și cron-safe
 // calculează ultima zi completă pentru tipul 'day'
@@ -160,6 +176,7 @@ try {
             WHERE type IS NULL
               AND dta >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
               AND dta < CURDATE()
+              AND reg12*reg13<7000
         ";
         $r = $conn->query($sumQuery);
         $row = $r->fetch_assoc();
@@ -228,7 +245,24 @@ foreach([0,1,2,3] as $plug){
 }
 
 if(!empty($inverterDATA)){
-	$inverterDATA=explode(" ",substr($inverterDATA,1));
+
+    if($VARS["batterySoft"]!=0){
+        if($VARS["batterySoft"]!=22){
+            if(/*$inverterDATA[5]>1000||*/(date("Hi")>500&&date("Hi")<2100)){
+                $conn->query("UPDATE variabile SET val=2 WHERE nume='batterySoft'");
+            }
+        }
+        if($VARS["batterySoft"]!=33){
+            if(/*$inverterDATA[5]<1000&&*/(date("Hi")<500||date("Hi")>2100)){
+                $conn->query("UPDATE variabile SET val=3 WHERE nume='batterySoft'");
+            }
+        }
+    }
+
+    if($inverterDATA[12]*$inverterDATA[13]>7000){
+        $inverterDATA[12]=$inverterDATA[13]=0;
+    }
+	
 	$pre="";$sqlA=$sqlB="";
 	for($i=0;$i<sizeof($inverterDATA);$i++){
 		$sqlA.=$pre." reg".$i;
@@ -239,8 +273,9 @@ if(!empty($inverterDATA)){
 	if($inverterDATA[5]<7000){
 		$conn->query($sql);
 	}
+}else{//save data without inverter
+    $sql="INSERT INTO inverter (teslaV,teslaA,plug0,plug1,plug2,plug3) VALUES ($CVdb,$CAdb,$p[0],$p[1],$p[2],$p[3])";
+	$conn->query($sql);
 }
-
-echo "end";
 
 $conn->close();

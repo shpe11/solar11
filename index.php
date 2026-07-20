@@ -2,17 +2,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 
-<style>
-	body{
-	font-family: "Open Sans", sans-serif;
-        margin:0px;
-}
-	
-<?php 
+<?php 	
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-
+	
 if(isset($_GET["cmd"])){
 	require_once("CRON.php");
 }
@@ -23,12 +17,31 @@ date_default_timezone_set('Europe/Bucharest');
 
 $servername = "localhost";
 $username = "***";
-$password = "***!";
-$dbname = "****";
+$password = "***";
+$dbname = "***";
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
     die("Conexiune e?uata: " . $conn->connect_error);
 }
+
+//tables
+//$conn->query("CREATE TABLE variabile (id INT AUTO_INCREMENT PRIMARY KEY,nume VARCHAR(100) NOT NULL UNIQUE,val INT NOT NULL DEFAULT 0);");
+//$conn->query("INSERT INTO variabile (nume, val) VALUES ('solarCharge', 1), ('batterySoft', 1);");
+
+//setvars
+if(isset($_GET["var"])){
+    $conn->query("UPDATE variabile SET val=".intval($_GET["val"])." WHERE nume='".preg_replace('/[^a-z0-9_]/i', '', $_GET["var"])."'");
+}
+//getvars
+if(empty($VARS)){
+    $VARS=[];
+}
+$r=$conn->query("SELECT * FROM variabile");
+while($row=$r->fetch_assoc()){
+    $VARS[$row["nume"]]=$row["val"];
+}
+
+
 
 if(isset($_GET["days"])&&isset($_GET["debug"])){
 	echo "<pre>";
@@ -38,13 +51,18 @@ if(isset($_GET["days"])&&isset($_GET["debug"])){
 	}
 	exit;
 }
-?><style>
+?>
+<style>
+body{
+	font-family: "Open Sans", sans-serif;
+        margin:0px;
+}
 * { margin:0; padding:0; }
 html, body { width:100%; height:100%; }
 canvas { display:block; }
 .button{
 	float:left;
-	width:16.66%;
+	width:14.2%;
 	height:100px;
 	background:#999;
 
@@ -66,6 +84,7 @@ if($CRON=="(B"){$cmode="#F00";}
 <div class="button" onClick="document.location='?';">today</div>
 <div class="button" onClick="document.location='?days';">last 30days</div>
 <div class="button" onClick="document.location='?days&days90';">last 90days</div>
+<div class="button" onClick="document.location='?days&days360';">last 360days</div>
 <div class="button" onclick="if(confirm('line mode?'))document.location='?cmd=POP00'" style="color:#FFF;background:<?php echo $cmode?>;">USB</div>
 <div class="button" onclick="if(confirm('default mode?'))document.location='?cmd=POP01'" style="color:#FFF;background:<?php echo $cmode?>;">SUB</div>
 <div class="button" onclick="if(confirm('battery mode?'))document.location='?cmd=POP02'" style="color:#FFF;background:<?php echo $cmode?>;">SBU</div>
@@ -111,12 +130,12 @@ if(isset($_GET["days"])){
 		FROM inverter 
 		WHERE type='day'
 		ORDER BY dta DESC
-		LIMIT ".(isset($_GET["days90"])?90:30)."
+		LIMIT ".(isset($_GET["days90"])?90:(isset($_GET["days360"])?360:30))."
 	) AS last30
 	");
 }else{
 	if(!isset($_GET["hour"])){
-		$r=$conn->query("SELECT SUM(teslaV*teslaA)/60 AS totalT, SUM(reg5)/60 AS total, MAX(reg4) AS max, SUM(reg12*reg13)/60 AS PVw, SUM(IF(reg12*reg13-reg5>0,reg12*reg13-reg5,0)/60) AS PVloss FROM inverter WHERE dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id");
+		$r=$conn->query("SELECT SUM(teslaV*teslaA)/60 AS totalT, SUM(reg5)/60 AS total, MAX(reg4) AS max, SUM(reg12*reg13)/60 AS PVw, SUM(IF(reg12*reg13-reg5>0,reg12*reg13-reg5,0)/60) AS PVloss FROM inverter WHERE reg12*reg13<7000 AND dta >= CURDATE() AND dta < CURDATE() + INTERVAL 1 DAY ORDER BY id");
 	}else{
 		$hour=explode(",",$_GET["hour"].",");
 		if(intval($hour[1])<=0)$hour[1]=1;
@@ -126,13 +145,24 @@ if(isset($_GET["days"])){
 $row=$r->fetch_assoc();
 $canvasHeight=512;
 $canvasWidth=1440;
-$k=$canvasHeight/min(max($row["max"],1),isset($_GET["days"])?70000:7000);?>
+$k=$canvasHeight/min(max($row["max"],1),isset($_GET["days"])?70000:7000);
+if($k>1)$k=.1;
+?>
 
 <div style="font-size: 2em;">
-ALL: <b><?php echo round($row["total"]/1000,2);?>KW</b>
+<span title="lsusb
+sudo rfkill unblock bluetooth
+sudo hciconfig hci0 up">
+ALL:</span> <b><?php echo round($row["total"]/1000,2);?>KW</b>
 TESLA: <b><?php echo round($row["totalT"]/1000,2);?>KW</b>
-PV: <b><?php echo round($row["PVw"]/1000,2);?>KW</b>
-PV LOST: <b><?php echo round($row["PVloss"]/1000,2);?>KW</b>
+PV: <b title="loss: <?php echo round($row["PVloss"]/1000,2);?>KW"><?php echo round($row["PVw"]/1000,2);?>KW</b>
+<div>
+<?php 
+foreach($VARS as $var=>$val){
+    echo '<button style="margin-right:1%;font-size:2em;color:#'.($val==0?"CCC":"000").'" onclick="document.location.href=\'?var='.$var.'&val='.($val==0?1:0).'\'">'.$var.'['.$val.']</button>';
+}
+?>
+</span>
 </div>
 
 <canvas id="canvas" width="<?php echo $canvasWidth; ?>" height="<?php echo $canvasHeight;?>" style="width:100%;height:<?php echo $canvasHeight;?>px"></canvas>
@@ -159,8 +189,8 @@ if (canvas.getContext) {
 	ctx.font = "15px Arial, Helvetica, sans-serif";
 	ctx.fillStyle="#FFF";
 	ctx.beginPath();
-	K=<?php echo isset($_GET["days"])?24/30:1;?>;
-	for(i=0;i<31;i+=2){
+	K=<?php echo isset($_GET["days360"])?24/12:(isset($_GET["days90"])?24/90:(isset($_GET["days"])?24/30:1));?>;
+	for(i=0;i<91;i+=2){
 		ctx.moveTo(60*i*K,canvas.height);
 		ctx.lineTo(60*i*K,0);
 		ctx.lineTo(60*(i+1)*K,0);
@@ -172,23 +202,24 @@ if (canvas.getContext) {
     ctx.strokeStyle="#444";
     ctx.stroke();
 
-	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gpower&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#F00",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?><?php if(isset($_GET["days360"]))echo "days360&";?>gpower&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#F00",1);});
 	var date = new Date();
     var curDate = null;
     do { curDate = new Date(); }
     while(curDate-date < 1000);
-	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gpv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#FF0",1);});
-	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gbat&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#0F0",1);});
-	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#88F",1);});
-	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gvv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#33F",1);});
-	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gta&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#FFF",1);});
-	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?>gtv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#F0F",1);});
-    
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?><?php if(isset($_GET["days360"]))echo "days360&";?>gpv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#FF0",1);});
+	//loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?><?php if(isset($_GET["days360"]))echo "days360&";?>gbat&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#0F0",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?><?php if(isset($_GET["days360"]))echo "days360&";?>gbatp&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#0F0",1);});
+    loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?><?php if(isset($_GET["days360"]))echo "days360&";?>gv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#88F",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?><?php if(isset($_GET["days360"]))echo "days360&";?>gvv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#33F",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?><?php if(isset($_GET["days360"]))echo "days360&";?>gta&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#FFF",1);});
+	loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?><?php if(isset($_GET["days360"]))echo "days360&";?>gtv&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>', function (data) {drawGraph(data, "#F0F",1);});
+	
     let datas = [];
     let loaded = 0;
     let total = 4;
     <?php foreach([0,1,2,3] as $plug){?>
-    loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?gp<?php echo $plug?>&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>',
+    loadAJAX('http://shpe:Akhenaton11!@shpe2.go.ro/inv/graph.php?<?php if(isset($_GET["days"]))echo "days&";?><?php if(isset($_GET["days90"]))echo "days90&";?><?php if(isset($_GET["days360"]))echo "days360&";?>gp<?php echo $plug?>&canvasHeight=<?php echo $canvasHeight;?>&k=<?php echo $k;?>',
     function (xhr) {
         datas[<?php echo $plug?>] = xhr.responseText;
         loaded++;
@@ -247,10 +278,9 @@ if (canvas.getContext) {
                 ctx.moveTo(graphs[g][i][0],<?php echo $canvasHeight;?>-lasty);
                 ctx.lineTo(graphs[g][i][0],graphs[g][i][1]-lasty);
                 lasty+=<?php echo $canvasHeight;?>-graphs[g][i][1];
-                ctx.lineWidth=1;
+                ctx.lineWidth=1<?php if(isset($_GET["days"])||isset($_GET["days90"])){echo "+3";}?>;
                 ctx.strokeStyle = colors[g];
                 ctx.stroke();
-                console.log(graphs[g][i][1]);
             }
 		}
 	}
@@ -264,7 +294,7 @@ if (canvas.getContext) {
 <?php } ?>
 </div>
 <script>
-const plugs = [];//[200,201,202,203];
+const plugs = [200,201,202,203];
 plugs.forEach((plug) => {
   fetch('plug.php?plug=' + plug)
     .then(res => res.text())

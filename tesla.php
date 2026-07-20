@@ -9,11 +9,11 @@ if(date("Hi")>=0&&date("Hi")<=2359){
         $CV=$CVdb=$outt["chargeState"]["chargerVoltage"];
         $CA=$CAdb=$outt["chargeState"]["chargerActualCurrent"];    
     }
-    file_put_contents(
+    /*file_put_contents(
         '/var/www/html/inv/inv.txt',
         date("c")." CMD=state charge CV:".$CV." CA:".$CA." OUT=" . substr(var_export($output,true),0,100) . "\n",
         FILE_APPEND
-    );
+    );*/
 
     $update = false;
     if ($CV > 190) {$CA++;$update = true;}
@@ -27,6 +27,17 @@ if(date("Hi")>=0&&date("Hi")<=2359){
             $CA--;
         }
         $update = true;
+    }
+    if($VARS["solarCharge"]){
+        $update = true;
+        $CA=0;
+        if($inverterDATA[12]*$inverterDATA[13]>200){
+            $CA=ceil($inverterDATA[12]*$inverterDATA[13]/200);
+            if(intval($VARS["solarCharge"])>1){
+                $CA=max($CA,intval($VARS["solarCharge"]));
+            }
+            $CA+=(((date("i") % 10)==0)?1:0);
+        }
     }
 
     if($update){
